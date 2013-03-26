@@ -5,7 +5,7 @@
             [clojure.string :as s])
   (:import [javax.mail Folder Message Flags Flags$Flag]
            [javax.mail.internet InternetAddress]
-           [javax.mail.search FlagTerm]))
+           [javax.mail.search SubjectTerm FlagTerm]))
 
 ;; Focus will be more on the reading and parsing of emails.
 ;; Very rough first draft ideas not suitable for production
@@ -109,13 +109,25 @@
   (with-open [connection (gen-store)]
     (let [folder (doto (.getFolder connection folder-name) (.open Folder/READ_ONLY))]
       (doall (map read-message (.search folder (FlagTerm. (Flags. Flags$Flag/SEEN) false)))))))
-  
+
+(defn- mark-read
+  [messages]
+  (doall (map #(.setFlags % (Flags. Flags$Flag/SEEN) true) messages)))
+
 (defn mark-all-read
   [folder-name]
   (with-open [connection (gen-store)]
       (let [folder (doto (.getFolder connection folder-name) (.open Folder/READ_WRITE))
             messages (.search folder (FlagTerm. (Flags. Flags$Flag/SEEN) false))]
-         (doall (map #(.setFlags % (Flags. Flags$Flag/SEEN) true) messages))
+        (mark-read messages)
+        nil)))
+        
+(defn mark-read-by-subject
+  [folder-name subject]
+  (with-open [connection (gen-store)]
+      (let [folder (doto (.getFolder connection folder-name) (.open Folder/READ_WRITE))
+            messages (.search folder (SubjectTerm. subject))]
+        (mark-read messages)
         nil)))
 
   (defn dump
