@@ -114,7 +114,9 @@
    This is the ultimate goal in extracting a message
    as a clojure map"
   (try 
-    {:from (sender msg)
+    {:message-id (message-id msg)
+     :message-number (.getMessageNumber msg)
+     :from (sender msg)
      :subject (subject msg)
      :sender (sender msg)
      :date-sent (date-sent msg)

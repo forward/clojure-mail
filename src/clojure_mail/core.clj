@@ -5,7 +5,7 @@
             [clojure.string :as s])
   (:import [javax.mail Folder Message Flags Flags$Flag]
            [javax.mail.internet InternetAddress]
-           [javax.mail.search SubjectTerm FlagTerm]))
+           [javax.mail.search SubjectTerm FlagTerm MessageIDTerm MessageNumberTerm]))
 
 ;; Focus will be more on the reading and parsing of emails.
 ;; Very rough first draft ideas not suitable for production
@@ -32,6 +32,10 @@
    :all "[Gmail]/All Mail"
    :sent "[Gmail]/Sent Mail"
    :spam "[Gmail]/Spam"})
+
+(def flags
+  {:answered "ANSWERED"
+   :deleted "DELETED"})
 
 (def sub-folder?
   "Check if a folder is a sub folder"
@@ -73,6 +77,14 @@
                  (.open Folder/READ_ONLY))]
     (.getMessageCount fd)))
 
+(defn- search [connection folder-name search-term &[options]]
+  (let [folder (doto (.getFolder connection folder-name) (.open (:mode options Folder/READ_ONLY)))]
+    (.search folder search-term)))
+
+(defn- mark-read
+  [messages]
+  (dorun (map #(.setFlags % (Flags. Flags$Flag/SEEN) true) messages)))
+
 ;; Public api
 
 (defn read-all
@@ -92,12 +104,6 @@
   "Reads a java mail message instance"
   [message]
   (msg/read-message message))
-
-(defn search [query])
-
-(def flags
-  {:answered "ANSWERED"
-   :deleted "DELETED"})
    
 (defn user-flags [message]
   (let [flags (msg/flags message)]
@@ -107,30 +113,19 @@
   "Find unread messages"
   [folder-name]
   (with-open [connection (gen-store)]
-    (let [folder (doto (.getFolder connection folder-name) (.open Folder/READ_ONLY))]
-      (doall (map read-message (.search folder (FlagTerm. (Flags. Flags$Flag/SEEN) false)))))))
-
-(defn- mark-read
-  [messages]
-  (doall (map #(.setFlags % (Flags. Flags$Flag/SEEN) true) messages)))
+    (doall (map read-message (search connection folder-name (FlagTerm. (Flags. Flags$Flag/SEEN) false))))))
 
 (defn mark-all-read
   [folder-name]
   (with-open [connection (gen-store)]
-      (let [folder (doto (.getFolder connection folder-name) (.open Folder/READ_WRITE))
-            messages (.search folder (FlagTerm. (Flags. Flags$Flag/SEEN) false))]
-        (mark-read messages)
-        nil)))
-        
-(defn mark-read-by-subject
-  [folder-name subject]
-  (with-open [connection (gen-store)]
-      (let [folder (doto (.getFolder connection folder-name) (.open Folder/READ_WRITE))
-            messages (.search folder (SubjectTerm. subject))]
-        (mark-read messages)
-        nil)))
+    (mark-read (search connection folder-name (FlagTerm. (Flags. Flags$Flag/SEEN) false) {:mode Folder/READ_WRITE}))))
 
-  (defn dump
+(defn mark-read-by-message-id
+  [folder-name message-id]
+  (with-open [connection (gen-store)]
+    (mark-read (search connection folder-name (MessageIDTerm. message-id) {:mode Folder/READ_WRITE}))))
+
+(defn dump
   "Handy function that dumps out a batch of emails to disk"
   [dir msgs]
   (doseq [msg msgs]

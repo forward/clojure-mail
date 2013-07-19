@@ -1,4 +1,4 @@
-(defproject org.clojars.christianblunden/clojure-mail "0.1.9"
+(defproject org.clojars.christianblunden/clojure-mail "0.1.10"
   :description "Clojure Email Library"
   :url "https://github.com/forward/clojure-mail"
   :license {:name "Eclipse Public License"
